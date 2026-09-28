@@ -10,24 +10,12 @@ spec:
 
   continuousProbes:
     interval: "200ms"
-    protocols:
-      - tcp
-      - http
     reconnectDelay: "1s"
     peerResolveInterval: "10s"
-
-  bandwidthTests:
-    enabled: false
-    schedule: "0 */4 * * *"
-    maxBandwidth: "100M"
-    concurrency: 1
-    testDuration: "10s"
-    udpTest: true
 
   externalSentinel:
     enabled: true
     metricsHostPort: 9200
-    healthHostPort: 9201
 
   tolerations:
     - operator: Exists

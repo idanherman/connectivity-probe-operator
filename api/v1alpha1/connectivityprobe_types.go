@@ -36,10 +36,6 @@ type ConnectivityProbeSpec struct {
 	// +optional
 	ContinuousProbes ContinuousProbeSpec `json:"continuousProbes,omitempty"`
 
-	// BandwidthTests configures optional scheduled iPerf3 bandwidth tests.
-	// +optional
-	BandwidthTests *BandwidthTestSpec `json:"bandwidthTests,omitempty"`
-
 	// ExternalSentinel configures HostPort exposure for out-of-cluster scrapers
 	// that must keep monitoring even when the API server is unavailable.
 	// +optional
@@ -79,11 +75,6 @@ type ContinuousProbeSpec struct {
 	// +kubebuilder:validation:Pattern=`^[0-9]+(ms|s)$`
 	Interval string `json:"interval,omitempty"`
 
-	// Protocols to probe. At least one required.
-	// +kubebuilder:default={"tcp"}
-	// +kubebuilder:validation:MinItems=1
-	Protocols []ProbeProtocol `json:"protocols,omitempty"`
-
 	// ReconnectDelay before retrying a failed peer connection.
 	// +kubebuilder:default="1s"
 	// +kubebuilder:validation:Pattern=`^[0-9]+(ms|s)$`
@@ -96,62 +87,19 @@ type ContinuousProbeSpec struct {
 	PeerResolveInterval string `json:"peerResolveInterval,omitempty"`
 }
 
-// ProbeProtocol is a supported probe type.
-// +kubebuilder:validation:Enum=tcp;http;websocket
-type ProbeProtocol string
-
-const (
-	ProbeProtocolTCP       ProbeProtocol = "tcp"
-	ProbeProtocolHTTP      ProbeProtocol = "http"
-	ProbeProtocolWebSocket ProbeProtocol = "websocket"
-)
-
-// BandwidthTestSpec configures scheduled iPerf3 tests.
-type BandwidthTestSpec struct {
-	// Enabled toggles bandwidth testing on or off.
-	// +kubebuilder:default=false
-	Enabled bool `json:"enabled"`
-
-	// Schedule is a cron expression (e.g. "0 */4 * * *").
-	// +kubebuilder:default="0 */4 * * *"
-	Schedule string `json:"schedule,omitempty"`
-
-	// MaxBandwidth caps each iPerf3 test (e.g. "100M").
-	// +kubebuilder:default="100M"
-	MaxBandwidth string `json:"maxBandwidth,omitempty"`
-
-	// Concurrency is the number of node-pairs tested simultaneously.
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Minimum=1
-	Concurrency int32 `json:"concurrency,omitempty"`
-
-	// TestDuration per node-pair.
-	// +kubebuilder:default="10s"
-	TestDuration string `json:"testDuration,omitempty"`
-
-	// UDPTest enables an additional UDP jitter/loss test per pair.
-	// +kubebuilder:default=false
-	UDPTest bool `json:"udpTest,omitempty"`
-}
-
 // ExternalSentinelSpec configures HostPort-based access for an external
 // observer that monitors the mesh independently of the Kubernetes API.
+// The same HTTP server serves metrics, status, and health on one port.
 type ExternalSentinelSpec struct {
 	// Enabled toggles HostPort exposure.
 	// +kubebuilder:default=false
 	Enabled bool `json:"enabled"`
 
-	// MetricsHostPort is the host port for the Prometheus metrics endpoint.
+	// MetricsHostPort is the node port for the agent HTTP server.
 	// +kubebuilder:default=9200
 	// +kubebuilder:validation:Minimum=1024
 	// +kubebuilder:validation:Maximum=65535
 	MetricsHostPort int32 `json:"metricsHostPort,omitempty"`
-
-	// HealthHostPort is the host port for the health/status endpoint.
-	// +kubebuilder:default=9201
-	// +kubebuilder:validation:Minimum=1024
-	// +kubebuilder:validation:Maximum=65535
-	HealthHostPort int32 `json:"healthHostPort,omitempty"`
 }
 
 // MetricsSpec configures Prometheus integration.
@@ -165,7 +113,7 @@ type MetricsSpec struct {
 	ScrapeInterval string `json:"scrapeInterval,omitempty"`
 
 	// LatencyBuckets for the probe-latency histogram (seconds).
-	// +kubebuilder:default={0.0005,0.001,0.005,0.01,0.025,0.05,0.1,0.25,0.5,1.0}
+	// +kubebuilder:default={"0.0005","0.001","0.002","0.005","0.01","0.025","0.05","0.075","0.1","0.15","0.2","0.3","0.5","1"}
 	LatencyBuckets []string `json:"latencyBuckets,omitempty"`
 }
 
@@ -203,21 +151,21 @@ type AlertingSpec struct {
 type ConnectivityProbeStatus struct {
 
 	// MeshSize is the number of nodes participating in the mesh.
-	MeshSize int32 `json:"meshSize,omitempty"`
+	MeshSize int32 `json:"meshSize"`
 
 	// EdgesTotal is the total number of edges (node-pairs) in the mesh.
-	EdgesTotal int32 `json:"edgesTotal,omitempty"`
+	EdgesTotal int32 `json:"edgesTotal"`
 
 	// EdgesUp is the number of edges currently healthy.
-	EdgesUp int32 `json:"edgesUp,omitempty"`
+	EdgesUp int32 `json:"edgesUp"`
 
 	// EdgesDown is the number of edges currently failing.
-	EdgesDown int32 `json:"edgesDown,omitempty"`
+	EdgesDown int32 `json:"edgesDown"`
 
 	// MeshHealthPercent is EdgesUp / EdgesTotal * 100.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=100
-	MeshHealthPercent int32 `json:"meshHealthPercent,omitempty"`
+	MeshHealthPercent int32 `json:"meshHealthPercent"`
 
 	// SentinelEndpoints lists node-ip:port pairs available for external scraping.
 	// Populated only when spec.externalSentinel.enabled is true.

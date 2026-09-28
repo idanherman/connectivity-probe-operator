@@ -1,0 +1,14 @@
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: connectivity-probe-mesh
+  namespace: grafana
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: grafana
+  allowCrossNamespaceImport: false
+  resyncPeriod: 60s
+  configMapRef:
+    name: grafana-dashboard-connectivity-probe
+    key: dashboard.json

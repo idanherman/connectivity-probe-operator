@@ -1,0 +1,389 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Agents",
+      "id": 1,
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "refId": "A", "expr": "count(connectivity_probe_peer_info)", "instant": true }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "stat",
+      "title": "Edges up",
+      "id": 2,
+      "gridPos": { "h": 4, "w": 5, "x": 4, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "refId": "A", "expr": "count(connectivity_probe_tcp_up == 1)", "instant": true }],
+      "fieldConfig": {
+        "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "stat",
+      "title": "Edges down",
+      "id": 3,
+      "gridPos": { "h": 4, "w": 5, "x": 9, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "refId": "A", "expr": "count(connectivity_probe_tcp_up == 0) OR on() vector(0)", "instant": true }],
+      "fieldConfig": {
+        "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" }
+    },
+    {
+      "type": "stat",
+      "title": "Mesh health",
+      "id": 4,
+      "gridPos": { "h": 4, "w": 5, "x": 14, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "refId": "A", "expr": "100 * sum(connectivity_probe_tcp_up) / clamp_min(count(connectivity_probe_tcp_up), 1)", "instant": true }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 95 }, { "color": "green", "value": 100 }] }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" }
+    },
+    {
+      "type": "stat",
+      "title": "Disconnects",
+      "id": 5,
+      "gridPos": { "h": 4, "w": 5, "x": 19, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "refId": "A", "expr": "sum(connectivity_probe_disconnects_total) OR on() vector(0)", "instant": true }],
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "area" }
+    },
+    {
+      "type": "table",
+      "title": "TCP mesh matrix",
+      "description": "N×N connectivity matrix. Rows = source, columns = destination. Green UP, red DOWN. Diagonal is self (no probe).",
+      "id": 6,
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "connectivity_probe_tcp_up",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "container": true,
+              "dst_ip": true,
+              "endpoint": true,
+              "instance": true,
+              "job": true,
+              "namespace": true,
+              "pod": true,
+              "service": true,
+              "prometheus": true,
+              "prometheus_replica": true
+            }
+          }
+        },
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "dst_node",
+            "rowField": "src_node",
+            "valueField": "Value",
+            "emptyValue": "fill"
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [{ "targetField": "src_node\\\\dst_node", "destinationType": "string" }]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "center",
+            "cellOptions": { "type": "color-background", "mode": "basic" },
+            "filterable": false,
+            "minWidth": 80
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "DOWN", "color": "dark-red", "index": 0 },
+                "1": { "text": "UP", "color": "dark-green", "index": 1 }
+              }
+            },
+            {
+              "type": "special",
+              "options": { "match": "empty", "result": { "text": "—", "color": "transparent", "index": 2 } }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "dark-red", "value": null },
+              { "color": "dark-green", "value": 1 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "src_node\\dst_node" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "auto" } },
+              { "id": "custom.width", "value": 170 },
+              { "id": "displayName", "value": "Source ↓  Dest →" }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "footer": { "show": false }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Edges",
+      "description": "Down edges sort first. RTT is the latest successful echo. Use the source node filter to narrow the list.",
+      "id": 7,
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "refId": "up", "expr": "connectivity_probe_tcp_up{src_node=~\"$node\"}", "format": "table", "instant": true },
+        { "refId": "rtt", "expr": "connectivity_probe_tcp_rtt_seconds{src_node=~\"$node\"}", "format": "table", "instant": true },
+        { "refId": "disc", "expr": "connectivity_probe_disconnects_total{src_node=~\"$node\"}", "format": "table", "instant": true }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "__name__": true,
+              "dst_ip": true,
+              "container": true,
+              "endpoint": true,
+              "instance": true,
+              "job": true,
+              "namespace": true,
+              "pod": true,
+              "service": true,
+              "prometheus": true,
+              "prometheus_replica": true
+            },
+            "renameByName": {
+              "src_node": "source",
+              "dst_node": "target",
+              "Value #up": "up",
+              "Value #rtt": "rtt",
+              "Value #disc": "disconnects"
+            },
+            "indexByName": { "source": 0, "target": 1, "up": 2, "rtt": 3, "disconnects": 4 }
+          }
+        },
+        { "id": "sortBy", "options": { "sort": [{ "field": "up", "desc": false }, { "field": "source", "desc": false }] } }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "up" },
+            "properties": [
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } },
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+              { "id": "color", "value": { "mode": "thresholds" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "rtt" },
+            "properties": [{ "id": "unit", "value": "s" }, { "id": "decimals", "value": 3 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "disconnects" },
+            "properties": [{ "id": "decimals", "value": 0 }]
+          }
+        ]
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "p99 round-trip",
+      "description": "99th percentile over the last 2 minutes, limited to the eight slowest edges in the selected time range. A sample between histogram buckets is drawn at the next bucket.",
+      "id": 8,
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.99, sum by (le, src_node, dst_node) (rate(connectivity_probe_tcp_latency_seconds_bucket{src_node=~\"$node\"}[2m]))) and on(src_node, dst_node) topk(8, max_over_time(histogram_quantile(0.99, sum by (le, src_node, dst_node) (rate(connectivity_probe_tcp_latency_seconds_bucket{src_node=~\"$node\"}[2m])))[$__range:]))",
+          "legendFormat": "{{src_node}} → {{dst_node}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10, "showPoints": "never" } },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["max"], "sortBy": "Max", "sortDesc": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Latest round-trip",
+      "id": 12,
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 28 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "connectivity_probe_tcp_rtt_seconds{src_node=~\"$node\"} and on(src_node, dst_node) topk(8, max_over_time(connectivity_probe_tcp_rtt_seconds{src_node=~\"$node\"}[$__range]))",
+          "legendFormat": "{{src_node}} → {{dst_node}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 5, "showPoints": "never" } },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull", "max"], "sortBy": "Max", "sortDesc": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Jitter",
+      "id": 9,
+      "gridPos": { "h": 9, "w": 8, "x": 0, "y": 38 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "refId": "A", "expr": "connectivity_probe_tcp_jitter_seconds{src_node=~\"$node\"} and on(src_node, dst_node) topk(8, max_over_time(connectivity_probe_tcp_jitter_seconds{src_node=~\"$node\"}[$__range]))", "legendFormat": "{{src_node}} → {{dst_node}}" }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 5, "showPoints": "never" } },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["max"], "sortBy": "Max", "sortDesc": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Loss, last 2 minutes",
+      "description": "Failed echoes divided by echoes in the last 2 minutes. A short loss burst shows up here instead of being diluted by every successful probe since the pod started.",
+      "id": 10,
+      "gridPos": { "h": 9, "w": 8, "x": 8, "y": 38 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "clamp_max(sum by (src_node, dst_node) (rate(connectivity_probe_tcp_probe_failures_total{src_node=~\"$node\"}[2m])) / clamp_min(sum by (src_node, dst_node) (rate(connectivity_probe_tcp_probes_total{src_node=~\"$node\"}[2m])), 1e-9), 1) and on(src_node, dst_node) topk(8, max_over_time(clamp_max(sum by (src_node, dst_node) (rate(connectivity_probe_tcp_probe_failures_total{src_node=~\"$node\"}[2m])) / clamp_min(sum by (src_node, dst_node) (rate(connectivity_probe_tcp_probes_total{src_node=~\"$node\"}[2m])), 1e-9), 1)[$__range:]))",
+          "legendFormat": "{{src_node}} → {{dst_node}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": { "drawStyle": "line", "fillOpacity": 15, "showPoints": "never" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["max"], "sortBy": "Max", "sortDesc": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Disconnect rate",
+      "id": 11,
+      "gridPos": { "h": 9, "w": 8, "x": 16, "y": 38 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(sum by (src_node, dst_node) (rate(connectivity_probe_disconnects_total{src_node=~\"$node\"}[5m])) * 60) and on(src_node, dst_node) topk(8, max_over_time((sum by (src_node, dst_node) (rate(connectivity_probe_disconnects_total{src_node=~\"$node\"}[5m])) * 60)[$__range:]))",
+          "legendFormat": "{{src_node}} → {{dst_node}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "cpm", "custom": { "drawStyle": "line", "fillOpacity": 15, "showPoints": "auto" } },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["max"], "sortBy": "Max", "sortDesc": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["connectivity", "mesh"],
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Prometheus",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": {},
+        "hide": 0,
+        "refresh": 1
+      },
+      {
+        "name": "node",
+        "label": "Source node",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "definition": "label_values(connectivity_probe_tcp_up, src_node)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(connectivity_probe_tcp_up, src_node)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": false,
+        "refresh": 1,
+        "sort": 1,
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "options": [],
+        "hide": 0
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timezone": "browser",
+  "title": "Connectivity probe mesh",
+  "uid": "connectivity-probe-mesh",
+  "version": 5
+}

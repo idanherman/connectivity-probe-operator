@@ -1,2 +1,6 @@
 resources:
 - manager.yaml
+images:
+- name: controller
+  newName: iherman-bastion-01.ocp.lab:5000/applications/connectivity-probe-operator
+  newTag: "0.1.0"
