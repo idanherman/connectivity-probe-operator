@@ -93,40 +93,6 @@ spec:
                 required:
                 - enabled
                 type: object
-              bandwidthTests:
-                description: BandwidthTests configures optional scheduled iPerf3 bandwidth
-                  tests.
-                properties:
-                  concurrency:
-                    default: 1
-                    description: Concurrency is the number of node-pairs tested simultaneously.
-                    format: int32
-                    minimum: 1
-                    type: integer
-                  enabled:
-                    default: false
-                    description: Enabled toggles bandwidth testing on or off.
-                    type: boolean
-                  maxBandwidth:
-                    default: 100M
-                    description: MaxBandwidth caps each iPerf3 test (e.g. "100M").
-                    type: string
-                  schedule:
-                    default: 0 */4 * * *
-                    description: Schedule is a cron expression (e.g. "0 */4 * * *").
-                    type: string
-                  testDuration:
-                    default: 10s
-                    description: TestDuration per node-pair.
-                    type: string
-                  udpTest:
-                    default: false
-                    description: UDPTest enables an additional UDP jitter/loss test
-                      per pair.
-                    type: boolean
-                required:
-                - enabled
-                type: object
               continuousProbes:
                 description: ContinuousProbes configures the always-on lightweight
                   probing mesh.
@@ -143,19 +109,6 @@ spec:
                       headless Service DNS to discover new/removed peers.
                     pattern: ^[0-9]+(ms|s|m)$
                     type: string
-                  protocols:
-                    default:
-                    - tcp
-                    description: Protocols to probe. At least one required.
-                    items:
-                      description: ProbeProtocol is a supported probe type.
-                      enum:
-                      - tcp
-                      - http
-                      - websocket
-                      type: string
-                    minItems: 1
-                    type: array
                   reconnectDelay:
                     default: 1s
                     description: ReconnectDelay before retrying a failed peer connection.
@@ -171,18 +124,10 @@ spec:
                     default: false
                     description: Enabled toggles HostPort exposure.
                     type: boolean
-                  healthHostPort:
-                    default: 9201
-                    description: HealthHostPort is the host port for the health/status
-                      endpoint.
-                    format: int32
-                    maximum: 65535
-                    minimum: 1024
-                    type: integer
                   metricsHostPort:
                     default: 9200
-                    description: MetricsHostPort is the host port for the Prometheus
-                      metrics endpoint.
+                    description: MetricsHostPort is the node port for the agent HTTP
+                      server.
                     format: int32
                     maximum: 65535
                     minimum: 1024
@@ -204,16 +149,20 @@ spec:
                     type: boolean
                   latencyBuckets:
                     default:
-                    - 0.0005
-                    - 0.001
-                    - 0.005
-                    - 0.01
-                    - 0.025
-                    - 0.05
-                    - 0.1
-                    - 0.25
-                    - 0.5
-                    - 1
+                    - "0.0005"
+                    - "0.001"
+                    - "0.002"
+                    - "0.005"
+                    - "0.01"
+                    - "0.025"
+                    - "0.05"
+                    - "0.075"
+                    - "0.1"
+                    - "0.15"
+                    - "0.2"
+                    - "0.3"
+                    - "0.5"
+                    - "1"
                     description: LatencyBuckets for the probe-latency histogram (seconds).
                     items:
                       type: string
@@ -437,6 +386,12 @@ spec:
                 items:
                   type: string
                 type: array
+            required:
+            - edgesDown
+            - edgesTotal
+            - edgesUp
+            - meshHealthPercent
+            - meshSize
             type: object
         type: object
     served: true

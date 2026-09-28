@@ -8,6 +8,7 @@ rules:
   - ""
   resources:
   - nodes
+  - pods
   verbs:
   - get
   - list
@@ -15,6 +16,7 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - serviceaccounts
   - services
   verbs:
   - create
@@ -48,12 +50,6 @@ rules:
   - patch
   - update
   - watch
-- apiGroups:
-  - monitoring.connectivity-probe.io
-  resources:
-  - connectivityprobes/finalizers
-  verbs:
-  - update
 - apiGroups:
   - monitoring.connectivity-probe.io
   resources:

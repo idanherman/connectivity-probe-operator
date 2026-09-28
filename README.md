@@ -6,15 +6,16 @@ A Kubernetes operator that deploys and manages a full-mesh connectivity monitori
 
 **connectivity-probe-operator** provides always-on, real-time visibility into node-to-node network health inside a Kubernetes/OpenShift cluster. It deploys a lightweight DaemonSet mesh where every agent continuously probes every other agent, measuring **latency**, **jitter**, **packet loss**, and **connectivity state** at sub-second intervals.
 
-Think of it as a production-grade evolution of `openshift-network-diagnostics` — but with full N×N mesh topology, sub-second sensitivity, and optional bandwidth testing via iPerf3.
+It is a full N×N mesh with sub-second TCP echo probes. Status counts **directed** edges: a healthy 3-node mesh reports `edgesUp: 6`, which is `N×(N-1)`, not the number of node pairs.
+
+The controller reads each agent's `/status` on the pod IP, port 8082. A default-deny NetworkPolicy in the agent namespace has to allow that port from the operator namespace, or the status stays at zero while Prometheus (which scrapes the headless Service) can still be healthy.
 
 ### Key Features
 
 - **Full mesh architecture** — every node probes every other node (N×N), not hub-and-spoke
-- **Sub-second probing** — configurable down to 50ms intervals for TCP/HTTP echo probes
+- **Sub-second probing** — configurable down to 50ms intervals for TCP echo probes
 - **Prometheus-native** — exposes latency histograms, jitter, loss, and connectivity gauges; auto-manages ServiceMonitor and PrometheusRule resources
-- **External sentinel mode** — HostPort-based metrics exposure that survives API server outages, enabling external monitoring that works when the cluster itself is degraded
-- **Scheduled bandwidth tests** — optional iPerf3 sweeps with bandwidth caps and sequential execution to avoid noisy-neighbor impact
+- **External sentinel mode** — one HostPort for metrics, status, and health, so an outside scraper keeps working when the API server is down
 - **Operator-managed lifecycle** — CRD-driven: a single `ConnectivityProbe` resource controls the entire deployment (DaemonSet, Services, ServiceMonitor, PrometheusRule)
 - **Minimal resource footprint** — designed to run at 10m CPU / 32Mi memory per node without impacting workloads
 
@@ -33,9 +34,8 @@ Think of it as a production-grade evolution of `openshift-network-diagnostics` �
    DaemonSet      ServiceMonitor    PrometheusRule
    (mesh agent)   (15s scrape)      (alert thresholds)
         │
-        ├── Continuous: TCP/HTTP probes @ configurable interval
+        ├── Continuous: TCP echo probes at a configurable interval
         ├── Exposes: latency histograms, jitter, loss, connectivity
-        ├── Scheduled: iPerf3 bandwidth tests (optional)
         └── HostPort: API-server-independent sentinel access
 ```
 
@@ -45,7 +45,7 @@ Each agent (one per node via DaemonSet) performs:
 
 1. **Peer discovery** — resolves the headless Service DNS to find all other agents
 2. **TCP mesh** — maintains persistent connections to every peer, sends echo probes at the configured interval
-3. **Metrics aggregation** — computes p50/p95/p99 latency, jitter, and loss over a rolling window
+3. **Metrics** — records a latency histogram, jitter, and loss for Prometheus
 4. **Prometheus exposition** — serves `/metrics` for in-cluster Prometheus scraping
 5. **HostPort sentinel** — optionally exposes metrics on a HostPort for external scrapers that bypass kube-proxy
 
@@ -53,7 +53,7 @@ Each agent (one per node via DaemonSet) performs:
 
 ### Prerequisites
 
-- Go 1.27+
+- Go 1.24 or newer
 - Access to a Kubernetes 1.28+ cluster
 - `kubectl` or `oc` configured
 
@@ -82,18 +82,21 @@ kubectl get connectivityprobes
 
 See [`config/samples/monitoring_v1alpha1_connectivityprobe.yaml`](config/samples/monitoring_v1alpha1_connectivityprobe.yaml) for a fully commented example CR.
 
+The Grafana dashboard is `config/grafana`. Its Prometheus datasource is a template variable that defaults to uid `thanos`. Apply it with:
+
+```sh
+kubectl apply -k config/grafana
+```
+
+ServiceMonitor and PrometheusRule are reconciled on the 30 second loop. Deleting one by hand is recreated on the next pass; they are not watched as owned objects because the API is optional.
+
 ## Project Structure
 
 ```
 ├── api/v1alpha1/          # CRD type definitions (ConnectivityProbe)
 ├── internal/controller/   # Operator reconciliation logic
-├── agent/                 # Mesh agent (DaemonSet workload)
-│   ├── cmd/               # Agent entrypoint
-│   └── pkg/
-│       ├── discovery/     # DNS-based peer discovery
-│       ├── mesh/          # TCP probe mesh implementation
-│       └── metrics/       # Prometheus metrics exposition
-├── config/                # Kustomize manifests (CRD, RBAC, samples)
+├── agent/cmd/             # Mesh agent (DaemonSet workload)
+├── config/                # Kustomize manifests (CRD, RBAC, samples, Grafana)
 └── Dockerfile             # Operator image
 ```
 

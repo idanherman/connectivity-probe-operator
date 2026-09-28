@@ -21,6 +21,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -51,7 +53,9 @@ var _ = Describe("ConnectivityProbe Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: monitoringv1alpha1.ConnectivityProbeSpec{
+						Image: "example.com/connectivity-probe-agent:test",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
@@ -77,8 +81,34 @@ var _ = Describe("ConnectivityProbe Controller", func() {
 				NamespacedName: typeNamespacedName,
 			})
 			Expect(err).NotTo(HaveOccurred())
-			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
-			// Example: If you expect a certain status condition after reconciliation, verify it here.
+
+			ds := &appsv1.DaemonSet{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name: resourceName + "-mesh-agent", Namespace: "default",
+			}, ds)).To(Succeed())
+			Expect(ds.Spec.Template.Spec.Containers[0].Image).To(Equal("example.com/connectivity-probe-agent:test"))
+			var buckets string
+			for _, env := range ds.Spec.Template.Spec.Containers[0].Env {
+				if env.Name == "LATENCY_BUCKETS" {
+					buckets = env.Value
+				}
+			}
+			Expect(buckets).To(ContainSubstring("0.0005"))
+
+			svc := &corev1.Service{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name: resourceName + "-mesh-headless", Namespace: "default",
+			}, svc)).To(Succeed())
+			Expect(svc.Spec.ClusterIP).To(Equal(corev1.ClusterIPNone))
+
+			sa := &corev1.ServiceAccount{}
+			Expect(k8sClient.Get(ctx, types.NamespacedName{
+				Name: resourceName + "-agent", Namespace: "default",
+			}, sa)).To(Succeed())
+
+			updated := &monitoringv1alpha1.ConnectivityProbe{}
+			Expect(k8sClient.Get(ctx, typeNamespacedName, updated)).To(Succeed())
+			Expect(updated.Status.Conditions).NotTo(BeEmpty())
 		})
 	})
 })
